@@ -230,7 +230,9 @@ public final class SelectStatement : Statement {
     
     /// Cache for indexOfColumn(). Keys are lowercase.
     private lazy var columnIndexes: [String: Int] = {
-        return Dictionary(keyValueSequence: self.columnNames.enumerated().map { ($1.lowercased(), $0) }.reversed())
+        return Dictionary(
+            self.columnNames.enumerated().map { ($0.element.lowercased(), $0.offset) },
+            uniquingKeysWith: { (left, _) in left })
     }()
     
     /// Returns the index of the leftmost column named `name`, in a
@@ -307,7 +309,7 @@ public final class SelectStatement : Statement {
             // TODO: include tables in the description
             return columns
                 .sorted { $0.key < $1.key }
-                .map { (table, columns) in "\(table)(\(columns.sorted().joined(separator: ", ")))" }
+                .map { "\($0.key)(\($0.value.sorted().joined(separator: ", ")))" }
                 .joined(separator: ", ")
         }
     }
@@ -593,7 +595,7 @@ public struct StatementArguments {
     /// - parameter sequence: A sequence of (key, value) pairs
     /// - returns: A StatementArguments.
     public init(_ dictionary: [String: DatabaseValueConvertible?]) {
-        namedValues = Dictionary(keys: dictionary.keys) { dictionary[$0]!?.databaseValue ?? .null }
+        namedValues = dictionary.mapValues { $0?.databaseValue ?? .null }
     }
     
     /// Initializes arguments from a sequence of (key, value) pairs, such as
@@ -605,7 +607,7 @@ public struct StatementArguments {
     /// - parameter sequence: A sequence of (key, value) pairs
     /// - returns: A StatementArguments.
     public init<Sequence: Swift.Sequence>(_ sequence: Sequence) where Sequence.Iterator.Element == (String, DatabaseValueConvertible?) {
-        namedValues = Dictionary(keyValueSequence: sequence.map { ($0, $1?.databaseValue ?? .null) })
+        namedValues = Dictionary(uniqueKeysWithValues: sequence.map { ($0.0, $0.1?.databaseValue ?? .null) })
     }
     
     /// Initializes arguments from [AnyHashable: Any].
@@ -840,8 +842,8 @@ extension StatementArguments : CustomStringConvertible {
     /// A textual representation of `self`.
     public var description: String {
         let valuesDescriptions = values.map { $0.description }
-        let namedValuesDescriptions = namedValues.map { (key, value) -> String in
-            return "\(String(reflecting: key)): \(value)"
+        let namedValuesDescriptions = namedValues.map {
+            return "\(String(reflecting: $0.key)): \($0.value)"
         }
         return "[" + (namedValuesDescriptions + valuesDescriptions).joined(separator: ", ") + "]"
     }
