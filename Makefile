@@ -74,6 +74,7 @@ ifdef XCPRETTY_PATH
 	endif
 endif
 
+# Custom Toolchain support
 ifdef TOOLCHAIN
 	# If TOOLCHAIN is specified, add xcodebuild parameter
 	XCODEBUILD += -toolchain $(TOOLCHAIN)
