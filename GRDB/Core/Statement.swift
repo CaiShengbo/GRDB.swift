@@ -268,11 +268,7 @@ public final class SelectStatement : Statement {
         }
         
         mutating func insert(column: String, ofTable table: String) {
-            if columns[table] != nil {
-                columns[table]!.insert(column)
-            } else {
-                columns[table] = [column]
-            }
+            columns[table, default: []].insert(column)
         }
         
         /// If true, selection is unknown
