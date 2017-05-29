@@ -62,12 +62,18 @@ struct RowKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol
     func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T : Decodable {
         if let valueType = T.self as? DatabaseValueConvertible.Type {
             return valueType.fromDatabaseValue(row[key.stringValue]) as! T
-        } else if let scopedRow = row.scoped(on: key.stringValue) {
-            return try T(from: RowDecoder(row: scopedRow, codingPath: codingPath + [key]))
+        } else if (T.self as? RowConvertible.Type) != nil {
+            if let scopedRow = row.scoped(on: key.stringValue) {
+                return try T(from: RowDecoder(row: scopedRow, codingPath: codingPath + [key]))
+            } else {
+                throw DecodingError.keyNotFound(
+                    key,
+                    DecodingError.Context(codingPath: codingPath, debugDescription: "missing scope \(key.stringValue)"))
+            }
         } else {
-            throw DecodingError.keyNotFound(
-                key,
-                DecodingError.Context(codingPath: codingPath, debugDescription: "missing scope"))
+            throw DecodingError.typeMismatch(
+                T.self,
+                DecodingError.Context(codingPath: codingPath, debugDescription: "missing DatbaseValueConvertible or RowConvertible conformance"))
         }
     }
     
@@ -110,10 +116,16 @@ struct RowKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol
             } else {
                 return nil
             }
-        } else if let scopedRow = row.scoped(on: key.stringValue) {
-            return try T(from: RowDecoder(row: scopedRow, codingPath: codingPath + [key]))
+        } else if (T.self as? RowConvertible.Type) != nil {
+            if let scopedRow = row.scoped(on: key.stringValue) {
+                return try T(from: RowDecoder(row: scopedRow, codingPath: codingPath + [key]))
+            } else {
+                return nil
+            }
         } else {
-            return nil
+            throw DecodingError.typeMismatch(
+                T.self,
+                DecodingError.Context(codingPath: codingPath, debugDescription: "missing DatbaseValueConvertible or RowConvertible conformance"))
         }
     }
     

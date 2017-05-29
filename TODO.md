@@ -19,7 +19,6 @@ Swift 4
 - [ ] Document Row subscript and Row.value(...) removal
 - [ ] RowConvertible & Decodable: check hasPersistentChangedValues
 - [ ] RowConvertible & Decodable: check what happens when a property is URL or Date (a DatabaseValueConvertible value which is not trivially Codable)
-- [ ] RowConvertible & Decodable: check what happens when a property is a struct (CLLocationCoordinate2D for example)
 
 v1.0 checklit
 
