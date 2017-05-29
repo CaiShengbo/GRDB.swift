@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 #if GRDBCIPHER
     import GRDBCipher
@@ -50,6 +51,18 @@ private struct CustomDecodableStruct : RowConvertible, Decodable {
 
 private struct DecodableNested : RowConvertible, Decodable {
     let child: DecodableStruct
+}
+
+private struct StructWithDate : RowConvertible, Decodable {
+    let date: Date
+}
+
+private struct StructWithURL : RowConvertible, Decodable {
+    let url: URL
+}
+
+private struct StructWithUUID : RowConvertible, Decodable {
+    let uuid: UUID
 }
 
 // Not supported yet by Swift
@@ -137,6 +150,24 @@ class RowConvertibleCodableTests: GRDBTestCase {
             XCTAssertEqual(value.child.name, "Arthur")
             XCTAssertEqual(value.child.color, .red)
         }
+    }
+    
+    func testStructWithDate() {
+        let date = Date()
+        let value = StructWithDate(row: ["date": date])
+        XCTAssert(abs(value.date.timeIntervalSince(date)) < 0.001)
+    }
+    
+    func testStructWithURL() {
+        let url = URL(string: "https://github.com")
+        let value = StructWithURL(row: ["url": url])
+        XCTAssertEqual(value.url, url)
+    }
+    
+    func testStructWithUUID() {
+        let uuid = UUID()
+        let value = StructWithUUID(row: ["uuid": uuid])
+        XCTAssertEqual(value.uuid, uuid)
     }
     
     // Not supported yet by Swift

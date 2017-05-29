@@ -73,7 +73,7 @@ struct RowKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol
         } else {
             throw DecodingError.typeMismatch(
                 T.self,
-                DecodingError.Context(codingPath: codingPath, debugDescription: "missing DatbaseValueConvertible or RowConvertible conformance"))
+                DecodingError.Context(codingPath: codingPath, debugDescription: "type does not adopt DatabaseValueConvertible or RowConvertible"))
         }
     }
     
@@ -125,7 +125,7 @@ struct RowKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol
         } else {
             throw DecodingError.typeMismatch(
                 T.self,
-                DecodingError.Context(codingPath: codingPath, debugDescription: "missing DatbaseValueConvertible or RowConvertible conformance"))
+                DecodingError.Context(codingPath: codingPath, debugDescription: "type does not adopt DatabaseValueConvertible or RowConvertible"))
         }
     }
     

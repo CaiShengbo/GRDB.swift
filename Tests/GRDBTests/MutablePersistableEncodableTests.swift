@@ -1,4 +1,5 @@
 import XCTest
+import Foundation
 #if GRDBCIPHER
     import GRDBCipher
 #elseif GRDBCUSTOMSQLITE
@@ -63,6 +64,21 @@ private struct CustomEncodableStruct : MutablePersistable, Encodable {
     }
 }
 
+private struct StructWithDate : Persistable, Encodable {
+    static let databaseTableName = "t1"
+    let date: Date
+}
+
+private struct StructWithURL : Persistable, Encodable {
+    static let databaseTableName = "t1"
+    let url: URL
+}
+
+private struct StructWithUUID : Persistable, Encodable {
+    static let databaseTableName = "t1"
+    let uuid: UUID
+}
+
 class MutablePersistableEncodableTests: GRDBTestCase {
     func testEncodableStruct() throws {
         let dbQueue = try makeDatabaseQueue()
@@ -115,6 +131,51 @@ class MutablePersistableEncodableTests: GRDBTestCase {
             
             let row = try Row.fetchOne(db, "SELECT id, name, color FROM t1")!
             XCTAssertEqual(row, ["id": 1, "name": "ARTHUR", "color": "red"])
+        }
+    }
+    
+    func testStructWithDate() throws {
+        let dbQueue = try makeDatabaseQueue()
+        try dbQueue.inDatabase { db in
+            try db.create(table: "t1") { t in
+                t.column("date", .datetime)
+            }
+            
+            let value = StructWithDate(date: Date())
+            try value.insert(db)
+            
+            let fetchedDate = try Date.fetchOne(db, "SELECT date FROM t1")!
+            XCTAssert(abs(fetchedDate.timeIntervalSince(value.date)) < 0.001)
+        }
+    }
+    
+    func testStructWithURL() throws {
+        let dbQueue = try makeDatabaseQueue()
+        try dbQueue.inDatabase { db in
+            try db.create(table: "t1") { t in
+                t.column("url", .text)
+            }
+            
+            let value = StructWithURL(url: URL(string: "https://github.com")!)
+            try value.insert(db)
+            
+            let fetchedURL = try URL.fetchOne(db, "SELECT url FROM t1")!
+            XCTAssertEqual(fetchedURL, value.url)
+        }
+    }
+    
+    func testStructWithUUID() throws {
+        let dbQueue = try makeDatabaseQueue()
+        try dbQueue.inDatabase { db in
+            try db.create(table: "t1") { t in
+                t.column("uuid", .blob)
+            }
+            
+            let value = StructWithUUID(uuid: UUID())
+            try value.insert(db)
+            
+            let fetchedUUID = try UUID.fetchOne(db, "SELECT uuid FROM t1")!
+            XCTAssertEqual(fetchedUUID, value.uuid)
         }
     }
 }
