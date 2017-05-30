@@ -63,21 +63,7 @@ struct RowKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol
             // Prefer DatabaseValueConvertible decoding over Decodable.
             // This allows us to decode Date from String, for example.
             return valueType.fromDatabaseValue(row[key.stringValue]) as! T
-        } else if (T.self as? RowConvertible.Type) != nil {
-            // T is RowConvertible: we need a row scope:
-            if let scopedRow = row.scoped(on: key.stringValue) {
-                return try T(from: RowDecoder(row: scopedRow, codingPath: codingPath + [key]))
-            } else {
-                throw DecodingError.keyNotFound(
-                    key,
-                    DecodingError.Context(codingPath: codingPath, debugDescription: "missing scope \(key.stringValue)"))
-            }
         } else {
-            // TODO: test with two Codable types that are not DatabaseValueConvertible
-            // and not RowConvertible.
-            //
-            // One that need a keyed container, and another that needs a single
-            // value container.
             return try T(from: RowDecoder(row: row, codingPath: codingPath + [key]))
         }
     }
@@ -117,26 +103,31 @@ struct RowKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol
         if let valueType = T.self as? DatabaseValueConvertible.Type {
             // Prefer DatabaseValueConvertible decoding over Decodable.
             // This allows us to decode Date from String, for example.
-            if let dbv: DatabaseValue = row[key.stringValue] {
-                return valueType.fromDatabaseValue(dbv) as! T?
+            if let dbValue: DatabaseValue = row[key.stringValue] {
+                return valueType.fromDatabaseValue(dbValue) as! T?
             } else {
                 return nil
             }
         } else if (T.self as? RowConvertible.Type) != nil {
             // T is RowConvertible: we need a row scope:
-            if let scopedRow = row.scoped(on: key.stringValue) {
-                return try T(from: RowDecoder(row: scopedRow, codingPath: codingPath + [key]))
-            } else {
-                return nil
-            }
-        } else {
-            // We don't know if we should look for a column or a row scope.
-            // Assume a value type, and check for column:
-            if row.hasColumn(key.stringValue) {
+            if row.scoped(on: key.stringValue) != nil {
                 return try T(from: RowDecoder(row: row, codingPath: codingPath + [key]))
             } else {
                 return nil
             }
+        } else if contains(key) {
+            // Column and/or row scope are present.
+            //
+            // But we don't know if T will ask for a one or the other.
+            //
+            // Postpone the decision until RowDecoder.container(keyedBy:) or
+            // RowDecoder.singleValueContainer() is called. But we have lost
+            // the ability to return nil.
+            return try T(from: RowDecoder(row: row, codingPath: codingPath + [key]))
+        } else {
+            // Both column and row scope are missing: we are sure that the value
+            // is missing.
+            return nil
         }
     }
     
@@ -237,7 +228,14 @@ struct RowDecoder: Decoder {
     var userInfo: [CodingUserInfoKey : Any] { return [:] }
     
     func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> {
-        return KeyedDecodingContainer(RowKeyedDecodingContainer<Key>(row: row, codingPath: codingPath))
+        if let key = codingPath.last {
+            guard let scopedRow = row.scoped(on: key!.stringValue) else {
+                throw DecodingError.keyNotFound(key!, DecodingError.Context(codingPath: codingPath, debugDescription: "missing row scope: \(key!.stringValue)"))
+            }
+            return KeyedDecodingContainer(RowKeyedDecodingContainer<Key>(row: scopedRow, codingPath: codingPath))
+        } else {
+            return KeyedDecodingContainer(RowKeyedDecodingContainer<Key>(row: row, codingPath: codingPath))
+        }
     }
     
     func unkeyedContainer() throws -> UnkeyedDecodingContainer {
