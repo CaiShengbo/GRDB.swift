@@ -28,6 +28,30 @@ class DatabaseValueConvertibleDecodableTests: GRDBTestCase {
         XCTAssertEqual(value.string, "foo")
     }
     
+    func testCustomDatabaseValueConvertible() throws {
+        struct Value : Decodable, DatabaseValueConvertible {
+            let string: String
+            
+            var databaseValue: DatabaseValue {
+                preconditionFailure("unused")
+            }
+            
+            static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> Value? {
+                if let string = String.fromDatabaseValue(databaseValue) {
+                    return Value(string: string + " (DatabaseValueConvertible)")
+                } else {
+                    return nil
+                }
+            }
+        }
+        
+        let dbQueue = try makeDatabaseQueue()
+        try dbQueue.inDatabase { db in
+            let value = try Value.fetchOne(db, "SELECT 'foo'")!
+            XCTAssertEqual(value.string, "foo (DatabaseValueConvertible)")
+        }
+    }
+    
     func testDecodableRawRepresentableFetchingMethod() throws {
         enum Value : String, Decodable, DatabaseValueConvertible {
             case foo, bar

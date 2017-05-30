@@ -8,63 +8,6 @@ import XCTest
     import GRDB
 #endif
 
-// // Does not adopt DatabaseValueConvertible
-// private enum Color: String, Decodable {
-//     case red, green, blue
-// }
-// 
-// private struct DecodableStruct : RowConvertible, Decodable {
-//     let id: Int64?
-//     let name: String
-//     let color: Color?
-// }
-// 
-// private class DecodableClass : RowConvertible, Decodable {
-//     let id: Int64?
-//     let name: String
-//     let color: Color?
-//     
-//     init(id: Int64?, name: String, color: Color?) {
-//         self.id = id
-//         self.name = name
-//         self.color = color
-//     }
-// }
-// 
-// // Does not adopt RowConvertible
-// private struct KeyedDecodable: Decodable {
-//     let id: Int64?
-//     let name: String
-//     let color: Color?
-// }
-// 
-// private struct DecodableNested : RowConvertible, Decodable {
-//     let rowConvertibleDecodable: DecodableStruct // RowConvertible & Decodable (keyed)
-//     let keyedDecodable: KeyedDecodable           // Decodable (keyed)
-//     let color: Color                             // Decodable (single value)
-// }
-//
-//// Not supported yet by Swift
-// private class DecodableDerivedClass : DecodableClass {
-//     let email: String?
-//
-//     init(id: Int64?, name: String, color: Color?, email: String?) {
-//         self.email = email
-//         super.init(id: id, name: name, color: color)
-//     }
-//
-//     // Codable boilerplate
-//     private enum CodingKeys : CodingKey {
-//         case email
-//     }
-//
-//     required init(from decoder: Decoder) throws {
-//         let container = try decoder.container(keyedBy: CodingKeys.self)
-//         self.email = try container.decodeIfPresent(String.self, forKey: .email)
-//         try super.init(from: container.superDecoder())
-//     }
-// }
-
 class RowConvertibleDecodableTests: GRDBTestCase { }
 
 // MARK: - RowConvertible conformance derived from Decodable
@@ -99,6 +42,21 @@ extension RowConvertibleDecodableTests {
         do {
             let s = Struct(row: ["someColumn": "foo"])
             XCTAssertEqual(s.value, "foo")
+        }
+    }
+    
+    func testCustomRowConvertible() {
+        struct Struct : RowConvertible, Decodable {
+            let value: String
+            
+            init(row: Row) {
+                value = (row["value"] as String) + " (RowConvertible)"
+            }
+        }
+        
+        do {
+            let s = Struct(row: ["value": "foo"])
+            XCTAssertEqual(s.value, "foo (RowConvertible)")
         }
     }
 }
