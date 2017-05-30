@@ -36,9 +36,11 @@ struct PersistableKeyedEncodingContainer<Key: CodingKey> : KeyedEncodingContaine
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     mutating func encode<T>(_ value: T, forKey key: Key) throws where T : Encodable {
         if T.self is DatabaseValueConvertible.Type {
+            // Prefer DatabaseValueConvertible encoding over Decodable.
+            // This allows us to encode Date as String, for example.
             encode((value as! DatabaseValueConvertible), key.stringValue)
         } else {
-            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: codingPath, debugDescription: "value does not adopt DatabaseValueConvertible"))
+            try value.encode(to: PersistableEncoder(codingPath: [key], encode: encode))
         }
     }
     
@@ -110,17 +112,64 @@ struct PersistableKeyedEncodingContainer<Key: CodingKey> : KeyedEncodingContaine
     }
 }
 
+struct DatabaseValueEncodingContainer : SingleValueEncodingContainer {
+    let key: CodingKey
+    let encode: (_ value: DatabaseValueConvertible?, _ key: String) -> Void
+
+    /// Encodes a null value.
+    ///
+    /// - throws: `EncodingError.invalidValue` if a null value is invalid in the current context for this format.
+    /// - precondition: May not be called after a previous `self.encode(_:)` call.
+    func encodeNil() throws { encode(nil, key.stringValue) }
+    
+    /// Encodes a single value of the given type.
+    ///
+    /// - parameter value: The value to encode.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    /// - precondition: May not be called after a previous `self.encode(_:)` call.
+    func encode(_ value: Bool) throws { encode(value, key.stringValue) }
+    func encode(_ value: Int) throws { encode(value, key.stringValue) }
+    func encode(_ value: Int8) throws { encode(value, key.stringValue) }
+    func encode(_ value: Int16) throws { encode(value, key.stringValue) }
+    func encode(_ value: Int32) throws { encode(value, key.stringValue) }
+    func encode(_ value: Int64) throws { encode(value, key.stringValue) }
+    func encode(_ value: UInt) throws { encode(value, key.stringValue) }
+    func encode(_ value: UInt8) throws { encode(value, key.stringValue) }
+    func encode(_ value: UInt16) throws { encode(value, key.stringValue) }
+    func encode(_ value: UInt32) throws { encode(value, key.stringValue) }
+    func encode(_ value: UInt64) throws { encode(value, key.stringValue) }
+    func encode(_ value: Float) throws { encode(value, key.stringValue) }
+    func encode(_ value: Double) throws { encode(value, key.stringValue) }
+    func encode(_ value: String) throws { encode(value, key.stringValue) }
+    
+    /// Encodes a single value of the given type.
+    ///
+    /// - parameter value: The value to encode.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    /// - precondition: May not be called after a previous `self.encode(_:)` call.
+    func encode<T>(_ value: T) throws where T : Encodable {
+        if let dbv = DatabaseValue(value: value) {
+            encode(dbv, key.stringValue)
+        } else {
+            throw EncodingError.invalidValue(
+                value,
+                EncodingError.Context(codingPath: [key], debugDescription: "value does not adopt DatabaseValueConvertible"))
+        }
+    }
+}
+
 struct PersistableEncoder : Encoder {
     /// The path of coding keys taken to get to this point in encoding.
     /// A `nil` value indicates an unkeyed container.
-    var codingPath: [CodingKey?] { return [] }
+    var codingPath: [CodingKey?]
     
     /// Any contextual information set by the user for encoding.
     var userInfo: [CodingUserInfoKey : Any] = [:]
     
     let encode: (_ value: DatabaseValueConvertible?, _ key: String) -> Void
     
-    init(encode: @escaping (_ value: DatabaseValueConvertible?, _ key: String) -> Void) {
+    init(codingPath: [CodingKey?], encode: @escaping (_ value: DatabaseValueConvertible?, _ key: String) -> Void) {
+        self.codingPath = codingPath
         self.encode = encode
     }
     
@@ -150,7 +199,7 @@ struct PersistableEncoder : Encoder {
     /// - precondition: May not be called after a prior `self.unkeyedContainer()` call.
     /// - precondition: May not be called after a value has been encoded through a previous `self.singleValueContainer()` call.
     func singleValueContainer() -> SingleValueEncodingContainer {
-        fatalError("single value encoding is not supported")
+        return DatabaseValueEncodingContainer(key: codingPath.last!!, encode: encode)
     }
 }
 
@@ -158,7 +207,7 @@ extension MutablePersistable where Self: Encodable {
     /// TODO
     public var persistentDictionary: [String: DatabaseValueConvertible?] {
         var persistentDictionary: [String: DatabaseValueConvertible?] = [:]
-        let encoder = PersistableEncoder(encode: { (value, key) in persistentDictionary.updateValue(value, forKey: key) })
+        let encoder = PersistableEncoder(codingPath: [], encode: { (value, key) in persistentDictionary.updateValue(value, forKey: key) })
         try! self.encode(to: encoder)
         return persistentDictionary
     }

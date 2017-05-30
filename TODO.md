@@ -18,7 +18,8 @@ Swift 4
 - [ ] Document support for Codable
 - [ ] Document Row subscript and Row.value(...) removal
 - [ ] Decodable: check hasPersistentChangedValues
-- [ ] Codable: we should let types encode themselves, instead of forcing DatabaseValueConvertible and RowConvertible 
+- [ ] Codable: we should let types encode themselves, instead of forcing DatabaseValueConvertible and RowConvertible
+- [ ] Codable + DatabaseValueConvertible
 
 v1.0 checklit
 

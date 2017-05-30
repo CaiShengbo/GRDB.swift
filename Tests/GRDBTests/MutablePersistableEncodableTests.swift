@@ -8,7 +8,7 @@ import Foundation
     import GRDB
 #endif
 
-private enum Color: String, DatabaseValueConvertible, Encodable {
+private enum Color: String, Encodable {
     case red, green, blue
 }
 
@@ -144,6 +144,7 @@ class MutablePersistableEncodableTests: GRDBTestCase {
             let value = StructWithDate(date: Date())
             try value.insert(db)
             
+            // TODO: test that the databaseValue is a String
             let fetchedDate = try Date.fetchOne(db, "SELECT date FROM t1")!
             XCTAssert(abs(fetchedDate.timeIntervalSince(value.date)) < 0.001)
         }

@@ -131,8 +131,12 @@ struct RowKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol
             }
         } else {
             // We don't know if we should look for a column or a row scope.
-            // This is a programmer error:
-            fatalError("type \(T.self) must adopt DatabaseValueConvertible or RowConvertible in order to be decoded from database row")
+            // Assume a value type, and check for column:
+            if row.hasColumn(key.stringValue) {
+                return try T(from: RowDecoder(row: row, codingPath: codingPath + [key]))
+            } else {
+                return nil
+            }
         }
     }
     
