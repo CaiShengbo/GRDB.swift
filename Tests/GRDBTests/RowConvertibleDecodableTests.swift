@@ -31,25 +31,6 @@ import XCTest
 //     }
 // }
 // 
-// private struct CustomDecodableStruct : RowConvertible, Decodable {
-//     let identifier: Int64?
-//     let pseudo: String
-//     let color: Color?
-//     
-//     private enum CodingKeys : String, CodingKey {
-//         case identifier = "id"
-//         case pseudo = "name"
-//         case color
-//     }
-//     
-//     init(from decoder: Decoder) throws {
-//         let container = try decoder.container(keyedBy: CodingKeys.self)
-//         identifier = try container.decodeIfPresent(Int64.self, forKey: .identifier)
-//         pseudo = try container.decode(String.self, forKey: .pseudo).uppercased()
-//         color = try container.decodeIfPresent(Color.self, forKey: .color)
-//     }
-// }
-// 
 // // Does not adopt RowConvertible
 // private struct KeyedDecodable: Decodable {
 //     let id: Int64?
@@ -84,9 +65,48 @@ import XCTest
 //     }
 // }
 
-// MARK: - Keyed Row Decoding
+class RowConvertibleDecodableTests: GRDBTestCase { }
 
-class RowConvertibleDecodableTests: GRDBTestCase {
+// MARK: - RowConvertible conformance derived from Decodable
+
+extension RowConvertibleDecodableTests {
+    
+    func testTrivialDecodable() {
+        struct Struct : RowConvertible, Decodable {
+            let value: String
+        }
+        
+        do {
+            let s = Struct(row: ["value": "foo"])
+            XCTAssertEqual(s.value, "foo")
+        }
+    }
+    
+    func testCustomDecodable() {
+        struct Struct : RowConvertible, Decodable {
+            let value: String
+            
+            private enum CodingKeys : String, CodingKey {
+                case value = "someColumn"
+            }
+            
+            init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                value = try container.decode(String.self, forKey: .value)
+            }
+        }
+        
+        do {
+            let s = Struct(row: ["someColumn": "foo"])
+            XCTAssertEqual(s.value, "foo")
+        }
+    }
+}
+
+// MARK: - Different kinds of single-value properties
+
+extension RowConvertibleDecodableTests {
+    
     func testTrivialProperty() {
         struct Struct : RowConvertible, Decodable {
             let int64: Int64
@@ -113,7 +133,7 @@ class RowConvertibleDecodableTests: GRDBTestCase {
         }
     }
     
-    func testDecodablePropertyFromSingleValueDecoder() {
+    func testSingleValueDecodableProperty() {
         struct Value : Decodable {
             let string: String
             
@@ -134,18 +154,12 @@ class RowConvertibleDecodableTests: GRDBTestCase {
             XCTAssertEqual(s.optionalValue!.string, "bar")
         }
         
-        // Nil values are not supported (fatal error "could not convert database value NULL to String")
-        // That's because GRDB doesn't know if the "optionalValue" is the name
-        // of a column, or the name of a row scope, and can't test for missing
-        // column, null column value, or missing row scope.
-        //
-        // TODO: report an issue
-//         do {
-//             // Null values
-//             let s = Struct(row: ["value": "foo", "optionalValue": nil])
-//             XCTAssertEqual(s.value.string, "foo")
-//             XCTAssertNil(s.optionalValue)
-//         }
+        do {
+            // Null values
+            let s = Struct(row: ["value": "foo", "optionalValue": nil])
+            XCTAssertEqual(s.value.string, "foo")
+            XCTAssertNil(s.optionalValue)
+        }
         
         do {
             // Missing and extra values
@@ -155,7 +169,48 @@ class RowConvertibleDecodableTests: GRDBTestCase {
         }
     }
     
-    func testDecodablePropertyWithCustomDatabaseValueConvertibleImplementation() {
+    func testDecodableRawRepresentableProperty() {
+        // This test is somewhat redundant with testSingleValueDecodableProperty,
+        // since a RawRepresentable enum is a "single-value" Decodable.
+        //
+        // But with an explicit test for enums, we are sure that enums, widely
+        // used, are supported.
+        enum Value : String, Decodable {
+            case foo, bar
+        }
+        
+        struct Struct : RowConvertible, Decodable {
+            let value: Value
+            let optionalValue: Value?
+        }
+        
+        do {
+            // No null values
+            let s = Struct(row: ["value": "foo", "optionalValue": "bar"])
+            XCTAssertEqual(s.value, .foo)
+            XCTAssertEqual(s.optionalValue!, .bar)
+        }
+        
+        do {
+            // Null values
+            let s = Struct(row: ["value": "foo", "optionalValue": nil])
+            XCTAssertEqual(s.value, .foo)
+            XCTAssertNil(s.optionalValue)
+        }
+        
+        do {
+            // Missing and extra values
+            let s = Struct(row: ["value": "foo", "ignored": "?"])
+            XCTAssertEqual(s.value, .foo)
+            XCTAssertNil(s.optionalValue)
+        }
+    }
+    
+    func testDatabaseValueConvertibleProperty() {
+        // This test makes sure that Date, for example, can be read from a String.
+        //
+        // Without this preference for fromDatabaseValue(_:) over init(from:Decoder),
+        // Date would only decode from doubles.
         struct Value : Decodable, DatabaseValueConvertible {
             let string: String
             
@@ -167,7 +222,8 @@ class RowConvertibleDecodableTests: GRDBTestCase {
                 string = try decoder.singleValueContainer().decode(String.self)
             }
             
-            // DatabaseValueConvertible
+            // DatabaseValueConvertible adoption
+            
             var databaseValue: DatabaseValue {
                 return string.databaseValue
             }
@@ -207,132 +263,47 @@ class RowConvertibleDecodableTests: GRDBTestCase {
             XCTAssertNil(s.optionalValue)
         }
     }
-    
-//    func testDecodableStruct() {
-//        struct Value1 : Decodable {
-//            let string: String
-//        }
-//        
-//        struct Value2 : Decodable, DatabaseValueConvertible {
-//            let string: String
-//            var databaseValue: DatabaseValue { return string.databaseValue }
-//        }
-//        
-//        struct Value3 : Decodable, DatabaseValueConvertible {
-//            let string: String
-//            var databaseValue: DatabaseValue { return string.databaseValue }
-//            
-//            static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> Value3? {
-//                return Value3(string: "decodedByDatabaseValueConvertible")
-//            }
-//        }
-//        
-//        struct Value4 : Decodable, DatabaseValueConvertible {
-//            let string: String
-//            var databaseValue: DatabaseValue { return string.databaseValue }
-//            
-//            init(string: String) {
-//                self.string = string
-//            }
-//            
-//            private enum CodingKeys : String, CodingKey {
-//                case string = "string"
-//            }
-//            
-//            init(from decoder: Decoder) throws {
-//                let container = try decoder.container(keyedBy: CodingKeys.self)
-//                string = try container.decode(String.self, forKey: .string) + " (Decodable)"
-//            }
-//            
-//            static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> Value4? {
-//                if let string = String.fromDatabaseValue(databaseValue) {
-//                    return Value4(string: string + " (DatabaseValueConvertible)")
-//                } else {
-//                    return nil
-//                }
-//            }
-//        }
-//        
-//        struct Struct : RowConvertible, Decodable {
-//            let int64: Int64
-//            let optionalInt64: Int64?
-//            let value1: Value1
-//            let optionalValue1: Value1?
-//            let value3: Value3
-//            let optionalValue3: Value3?
-//            let value4: Value4
-//            let optionalValue4: Value4?
-//        }
-//        
-//        do {
-//            // No null values
-//            let value = Struct(row: ["id": 1, "name": "Arthur", "color": "red"])
-//            XCTAssertEqual(value.id, 1)
-//            XCTAssertEqual(value.name, "Arthur")
-//            XCTAssertEqual(value.color, .red)
-//        }
-//        do {
-//            // Null, missing, and extra values
-//            let value = Struct(row: ["id": nil, "name": "Arthur", "ignored": true])
-//            XCTAssertNil(value.id)
-//            XCTAssertEqual(value.name, "Arthur")
-//            XCTAssertNil(value.color)
-//        }
-//    }
-//
-//    func testCustomDecodableStruct() {
-//        do {
-//            // No null values
-//            let value = CustomDecodableStruct(row: ["id": 1, "name": "Arthur", "color": "red"])
-//            XCTAssertEqual(value.identifier, 1)
-//            XCTAssertEqual(value.pseudo, "ARTHUR")
-//            XCTAssertEqual(value.color, .red)
-//        }
-//        do {
-//            // Null, missing, and extra values
-//            let value = CustomDecodableStruct(row: ["id": nil, "name": "Arthur", "ignored": true])
-//            XCTAssertNil(value.identifier)
-//            XCTAssertEqual(value.pseudo, "ARTHUR")
-//            XCTAssertNil(value.color)
-//        }
-//    }
-//    
-//    func testDecodableClass() {
-//        do {
-//            // No null values
-//            let value = DecodableClass(row: ["id": 1, "name": "Arthur", "color": "red"])
-//            XCTAssertEqual(value.id, 1)
-//            XCTAssertEqual(value.name, "Arthur")
-//            XCTAssertEqual(value.color, .red)
-//        }
-//        do {
-//            // Null, missing, and extra values
-//            let value = DecodableClass(row: ["id": nil, "name": "Arthur", "ignored": true])
-//            XCTAssertNil(value.id)
-//            XCTAssertEqual(value.name, "Arthur")
-//            XCTAssertNil(value.color)
-//        }
-//    }
-//    
-//    func testDecodableNested() throws {
-//        let dbQueue = try makeDatabaseQueue()
-//        try dbQueue.inDatabase { db in
-//            let value = try DecodableNested.fetchOne(
-//                db,
-//                "SELECT :id AS id, :name AS name, :color AS color",
-//                arguments: ["id": 1, "name": "Arthur", "color": "red"],
-//                adapter: ScopeAdapter([
-//                    "rowConvertibleDecodable": SuffixRowAdapter(fromIndex: 0),
-//                    "keyedDecodable": SuffixRowAdapter(fromIndex: 0)]))!
-//            XCTAssertEqual(value.rowConvertibleDecodable.id, 1)
-//            XCTAssertEqual(value.rowConvertibleDecodable.name, "Arthur")
-//            XCTAssertEqual(value.rowConvertibleDecodable.color, .red)
-//            XCTAssertEqual(value.keyedDecodable.id, 1)
-//            XCTAssertEqual(value.keyedDecodable.name, "Arthur")
-//            XCTAssertEqual(value.keyedDecodable.color, .red)
-//            XCTAssertEqual(value.color, .red)
-//        }
-//    }
+}
+
+// MARK: - Keyed properties
+
+extension RowConvertibleDecodableTests {
+
+    func testKeyedDecodableProperty() throws {
+        struct Value : Decodable {
+            let a: String
+            let b: String
+        }
+        
+        struct Struct : RowConvertible, Decodable {
+            let value: Value
+            let optionalValue: Value?
+        }
+        
+        let dbQueue = try makeDatabaseQueue()
+        try dbQueue.inDatabase { db in
+            do {
+                // No missing row scope
+                let adapter = ScopeAdapter([
+                    "value": SuffixRowAdapter(fromIndex: 0),
+                    "optionalValue": ColumnMapping(["b": "a", "a": "b"])])
+                let s = try Struct.fetchOne(db, "SELECT ? AS a, ? AS b", arguments: ["foo", "bar"], adapter: adapter)!
+                XCTAssertEqual(s.value.a, "foo")
+                XCTAssertEqual(s.value.b, "bar")
+                XCTAssertEqual(s.optionalValue!.a, "bar")
+                XCTAssertEqual(s.optionalValue!.b, "foo")
+            }
+            do {
+                // Missing row scope
+                let adapter = ScopeAdapter([
+                    "value": SuffixRowAdapter(fromIndex: 0)])
+                let s = try Struct.fetchOne(db, "SELECT ? AS a, ? AS b", arguments: ["foo", "bar"], adapter: adapter)!
+                XCTAssertEqual(s.value.a, "foo")
+                XCTAssertEqual(s.value.b, "bar")
+                XCTAssertNil(s.optionalValue)
+            }
+        }
+    }
 }
 
 // MARK: - Foundation Codable Types
@@ -369,23 +340,3 @@ extension RowConvertibleDecodableTests {
         XCTAssertEqual(value.uuid, uuid)
     }
 }
-
-// Not supported yet by Swift
-// func testDecodableDerivedClass() {
-//     do {
-//         // No null values
-//         let player = DecodableDerivedClass(row: ["id": 1, "name": "Arthur", "color": "red", "email": "arthur@example.com"])
-//         XCTAssertEqual(player.id, 1)
-//         XCTAssertEqual(player.name, "Arthur")
-//         XCTAssertEqual(player.color, .red)
-//         XCTAssertEqual(player.email, "arthur@example.com")
-//     }
-//     do {
-//         // Null, missing, and extra values
-//         let player = DecodableDerivedClass(row: ["id": nil, "name": "Arthur", "ignored": true])
-//         XCTAssertNil(player.id)
-//         XCTAssertEqual(player.name, "Arthur")
-//         XCTAssertNil(player.color)
-//         XCTAssertNil(player.email)
-//     }
-// }

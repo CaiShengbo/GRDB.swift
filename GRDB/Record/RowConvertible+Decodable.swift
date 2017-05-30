@@ -1,4 +1,4 @@
-struct RowKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol {
+private struct RowKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol {
     let row: Row
     
     init(row: Row, codingPath: [CodingKey?]) {
@@ -115,14 +115,31 @@ struct RowKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol
             } else {
                 return nil
             }
-        } else if contains(key) {
-            // Column and/or row scope are present.
+        } else if let dbValue: DatabaseValue = row[key.stringValue] {
+            // We don't know if T(from: Decoder) will request a single value
+            // container, or a keyed container.
             //
-            // But we don't know if T will ask for a one or the other.
+            // Since the column is present, let's assume that T will ask for a
+            // single value container (a column). This is our only opportunity
+            // to turn NULL into nil. If T eventually asks for a keyed container
+            // (a row scope), then the user will face a weird error.
             //
-            // Postpone the decision until RowDecoder.container(keyedBy:) or
-            // RowDecoder.singleValueContainer() is called. But we have lost
-            // the ability to return nil.
+            // This looks like a design issue in the Codable library to me.
+            if dbValue.isNull {
+                return nil
+            } else {
+                return try T(from: RowDecoder(row: row, codingPath: codingPath + [key]))
+            }
+        } else if row.scoped(on: key.stringValue) != nil {
+            // We don't know if T(from: Decoder) will request a single value
+            // container, or a keyed container.
+            //
+            // Since the row scope is present, let's assume that T will ask for
+            // a keyed container (a row scope). If T eventually asks for a
+            // single value container (a column), then the user will face a
+            // weird error.
+            //
+            // This looks like a design issue in the Codable library to me.
             return try T(from: RowDecoder(row: row, codingPath: codingPath + [key]))
         } else {
             // Both column and row scope are missing: we are sure that the value
@@ -172,7 +189,7 @@ struct RowKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol
     }
 }
 
-struct RowColumnDecodingContainer: SingleValueDecodingContainer {
+private struct RowColumnDecodingContainer: SingleValueDecodingContainer {
     let row: Row
     let column: String
     
@@ -215,7 +232,7 @@ struct RowColumnDecodingContainer: SingleValueDecodingContainer {
     }
 }
 
-struct RowDecoder: Decoder {
+private struct RowDecoder: Decoder {
     let row: Row
     
     init(row: Row, codingPath: [CodingKey?]) {

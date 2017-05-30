@@ -19,9 +19,4 @@ extension NSURL : DatabaseValueConvertible {
 }
 
 /// URL stores its absoluteString in the database.
-extension URL : DatabaseValueConvertible {
-    /// Returns a value initialized from *databaseValue*, if possible.
-    public static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> URL? {
-        return NSURL.fromDatabaseValue(databaseValue).flatMap { $0 as URL }
-    }
-}
+extension URL : DatabaseValueConvertible { }

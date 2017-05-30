@@ -1,4 +1,4 @@
-struct PersistableKeyedEncodingContainer<Key: CodingKey> : KeyedEncodingContainerProtocol {
+private struct PersistableKeyedEncodingContainer<Key: CodingKey> : KeyedEncodingContainerProtocol {
     let encode: (_ value: DatabaseValueConvertible?, _ key: String) -> Void
     
     init(encode: @escaping (_ value: DatabaseValueConvertible?, _ key: String) -> Void) {
@@ -112,7 +112,7 @@ struct PersistableKeyedEncodingContainer<Key: CodingKey> : KeyedEncodingContaine
     }
 }
 
-struct DatabaseValueEncodingContainer : SingleValueEncodingContainer {
+private struct DatabaseValueEncodingContainer : SingleValueEncodingContainer {
     let key: CodingKey
     let encode: (_ value: DatabaseValueConvertible?, _ key: String) -> Void
 
@@ -158,7 +158,7 @@ struct DatabaseValueEncodingContainer : SingleValueEncodingContainer {
     }
 }
 
-struct PersistableEncoder : Encoder {
+private struct PersistableEncoder : Encoder {
     /// The path of coding keys taken to get to this point in encoding.
     /// A `nil` value indicates an unkeyed container.
     var codingPath: [CodingKey?]

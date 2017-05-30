@@ -1,4 +1,4 @@
-struct DatabaseValueDecodingContainer: SingleValueDecodingContainer {
+private struct DatabaseValueDecodingContainer: SingleValueDecodingContainer {
     let dbValue: DatabaseValue
     let codingPath: [CodingKey?]
     
@@ -45,7 +45,7 @@ struct DatabaseValueDecodingContainer: SingleValueDecodingContainer {
     }
 }
 
-struct DatabaseValueDecoder: Decoder {
+private struct DatabaseValueDecoder: Decoder {
     let dbValue: DatabaseValue
     
     init(dbValue: DatabaseValue, codingPath: [CodingKey?]) {
@@ -77,5 +77,19 @@ struct DatabaseValueDecoder: Decoder {
 public extension DatabaseValueConvertible where Self: Decodable {
     public static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> Self? {
         return try? self.init(from: DatabaseValueDecoder(dbValue: databaseValue, codingPath: []))
+    }
+}
+
+public extension DatabaseValueConvertible where Self: Decodable & RawRepresentable, Self.RawValue: DatabaseValueConvertible {
+    public static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> Self? {
+        // Preserve custom database decoding
+        return RawValue.fromDatabaseValue(databaseValue).flatMap { self.init(rawValue: $0) }
+    }
+}
+
+public extension DatabaseValueConvertible where Self: Decodable & ReferenceConvertible, Self.ReferenceType: DatabaseValueConvertible {
+    public static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> Self? {
+        // Preserve custom database decoding
+        return ReferenceType.fromDatabaseValue(databaseValue).flatMap { cast($0) }
     }
 }

@@ -13,7 +13,7 @@ import Foundation
 ///
 ///     // ... then the ReferenceConvertible type can freely adopt DatabaseValueConvertible:
 ///     extension Foo : DatabaseValueConvertible { /* empty */ }
-extension ReferenceConvertible where Self: DatabaseValueConvertible, Self.ReferenceType: DatabaseValueConvertible {
+extension DatabaseValueConvertible where Self: ReferenceConvertible, Self.ReferenceType: DatabaseValueConvertible {
     
     /// Returns a value that can be stored in the database.
     public var databaseValue: DatabaseValue {
