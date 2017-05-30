@@ -86,10 +86,3 @@ public extension DatabaseValueConvertible where Self: Decodable & RawRepresentab
         return RawValue.fromDatabaseValue(databaseValue).flatMap { self.init(rawValue: $0) }
     }
 }
-
-public extension DatabaseValueConvertible where Self: Decodable & ReferenceConvertible, Self.ReferenceType: DatabaseValueConvertible {
-    public static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> Self? {
-        // Preserve custom database decoding
-        return ReferenceType.fromDatabaseValue(databaseValue).flatMap { cast($0) }
-    }
-}

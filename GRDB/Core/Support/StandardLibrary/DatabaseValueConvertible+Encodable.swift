@@ -102,10 +102,3 @@ public extension DatabaseValueConvertible where Self: Encodable & RawRepresentab
         return rawValue.databaseValue
     }
 }
-
-public extension DatabaseValueConvertible where Self: Encodable & ReferenceConvertible, Self.ReferenceType: DatabaseValueConvertible {
-    public var databaseValue: DatabaseValue {
-        // Preserve custom database encoding
-        return (self as! ReferenceType).databaseValue
-    }
-}
