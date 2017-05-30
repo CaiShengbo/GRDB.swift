@@ -7,7 +7,7 @@ import XCTest
     import GRDB
 #endif
 
-enum SQLiteStorageClass {
+private enum SQLiteStorageClass {
     case null
     case integer
     case real
@@ -15,7 +15,7 @@ enum SQLiteStorageClass {
     case blob
 }
 
-extension DatabaseValue {
+private extension DatabaseValue {
     var storageClass: SQLiteStorageClass {
         switch storage {
         case .null:
