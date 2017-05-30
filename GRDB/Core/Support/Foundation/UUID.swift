@@ -22,4 +22,9 @@ extension NSUUID : DatabaseValueConvertible {
 }
 
 /// UUID adopts DatabaseValueConvertible
-extension UUID : DatabaseValueConvertible { }
+extension UUID : DatabaseValueConvertible {
+    /// Returns a value initialized from *databaseValue*, if possible.
+    public static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> UUID? {
+        return NSUUID.fromDatabaseValue(databaseValue).flatMap { $0 as UUID }
+    }
+}

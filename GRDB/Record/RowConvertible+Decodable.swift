@@ -172,7 +172,7 @@ struct RowKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol
     }
 }
 
-struct DatabaseValueDecodingContainer: SingleValueDecodingContainer {
+struct RowColumnDecodingContainer: SingleValueDecodingContainer {
     let row: Row
     let column: String
     
@@ -245,7 +245,7 @@ struct RowDecoder: Decoder {
     }
     
     func singleValueContainer() throws -> SingleValueDecodingContainer {
-        return DatabaseValueDecodingContainer(row: row, column: codingPath.last!!.stringValue)
+        return RowColumnDecodingContainer(row: row, column: codingPath.last!!.stringValue)
     }
 }
 
