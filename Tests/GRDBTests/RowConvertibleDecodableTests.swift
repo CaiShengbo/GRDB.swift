@@ -8,6 +8,7 @@ import XCTest
     import GRDB
 #endif
 
+// Does not adopt DatabaseValueConvertible
 private enum Color: String, Decodable {
     case red, green, blue
 }
@@ -49,8 +50,17 @@ private struct CustomDecodableStruct : RowConvertible, Decodable {
     }
 }
 
+// Does not adopt RowConvertible
+private struct KeyedDecodable: Decodable {
+    let id: Int64?
+    let name: String
+    let color: Color?
+}
+
 private struct DecodableNested : RowConvertible, Decodable {
-    let child: DecodableStruct
+    let rowConvertibleDecodable: DecodableStruct // RowConvertible & Decodable (keyed)
+    let keyedDecodable: KeyedDecodable           // Decodable (keyed)
+    let color: Color                             // Decodable (single value)
 }
 
 private struct StructWithDate : RowConvertible, Decodable {
@@ -145,10 +155,16 @@ class RowConvertibleCodableTests: GRDBTestCase {
                 db,
                 "SELECT :id AS id, :name AS name, :color AS color",
                 arguments: ["id": 1, "name": "Arthur", "color": "red"],
-                adapter: ScopeAdapter(["child": SuffixRowAdapter(fromIndex: 0)]))!
-            XCTAssertEqual(value.child.id, 1)
-            XCTAssertEqual(value.child.name, "Arthur")
-            XCTAssertEqual(value.child.color, .red)
+                adapter: ScopeAdapter([
+                    "rowConvertibleDecodable": SuffixRowAdapter(fromIndex: 0),
+                    "keyedDecodable": SuffixRowAdapter(fromIndex: 0)]))!
+            XCTAssertEqual(value.rowConvertibleDecodable.id, 1)
+            XCTAssertEqual(value.rowConvertibleDecodable.name, "Arthur")
+            XCTAssertEqual(value.rowConvertibleDecodable.color, .red)
+            XCTAssertEqual(value.keyedDecodable.id, 1)
+            XCTAssertEqual(value.keyedDecodable.name, "Arthur")
+            XCTAssertEqual(value.keyedDecodable.color, .red)
+            XCTAssertEqual(value.color, .red)
         }
     }
     

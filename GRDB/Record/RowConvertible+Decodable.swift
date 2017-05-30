@@ -24,7 +24,7 @@ struct RowKeyedDecodingContainer<Key: CodingKey>: KeyedDecodingContainerProtocol
     /// - parameter key: The key to search for.
     /// - returns: Whether the `Decoder` has an entry for the given key.
     func contains(_ key: Key) -> Bool {
-        return row.hasColumn(key.stringValue)
+        return row.hasColumn(key.stringValue) || (row.scoped(on: key.stringValue) != nil)
     }
     
     /// Decodes a value of the given type for the given key.
