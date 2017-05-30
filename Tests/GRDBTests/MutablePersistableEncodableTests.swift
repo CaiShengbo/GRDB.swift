@@ -144,8 +144,14 @@ class MutablePersistableEncodableTests: GRDBTestCase {
             let value = StructWithDate(date: Date())
             try value.insert(db)
             
-            // TODO: test that the databaseValue is a String
-            let fetchedDate = try Date.fetchOne(db, "SELECT date FROM t1")!
+            let dbValue = try DatabaseValue.fetchOne(db, "SELECT date FROM t1")!
+            
+            // Date has a default Encodable implementation which encodes a Double.
+            // We expect here a String, because DatabaseValueConvertible has
+            // precedence over Encodable.
+            XCTAssert(dbValue.storage.value is String)
+            
+            let fetchedDate = Date.fromDatabaseValue(dbValue)!
             XCTAssert(abs(fetchedDate.timeIntervalSince(value.date)) < 0.001)
         }
     }
@@ -160,7 +166,9 @@ class MutablePersistableEncodableTests: GRDBTestCase {
             let value = StructWithURL(url: URL(string: "https://github.com")!)
             try value.insert(db)
             
-            let fetchedURL = try URL.fetchOne(db, "SELECT url FROM t1")!
+            let dbValue = try DatabaseValue.fetchOne(db, "SELECT url FROM t1")!
+            XCTAssert(dbValue.storage.value is String)
+            let fetchedURL = URL.fromDatabaseValue(dbValue)!
             XCTAssertEqual(fetchedURL, value.url)
         }
     }
@@ -175,7 +183,9 @@ class MutablePersistableEncodableTests: GRDBTestCase {
             let value = StructWithUUID(uuid: UUID())
             try value.insert(db)
             
-            let fetchedUUID = try UUID.fetchOne(db, "SELECT uuid FROM t1")!
+            let dbValue = try DatabaseValue.fetchOne(db, "SELECT uuid FROM t1")!
+            XCTAssert(dbValue.storage.value is Data)
+            let fetchedUUID = UUID.fromDatabaseValue(dbValue)!
             XCTAssertEqual(fetchedUUID, value.uuid)
         }
     }
