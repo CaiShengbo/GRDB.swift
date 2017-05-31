@@ -91,7 +91,7 @@ extension RowConvertibleDecodableTests {
         }
     }
     
-    func testSingleValueDecodableProperty() {
+    func testTrivialSingleValueDecodableProperty() {
         struct Value : Decodable {
             let string: String
             
@@ -123,6 +123,50 @@ extension RowConvertibleDecodableTests {
             // Missing and extra values
             let s = Struct(row: ["value": "foo", "ignored": "?"])
             XCTAssertEqual(s.value.string, "foo")
+            XCTAssertNil(s.optionalValue)
+        }
+    }
+    
+    func testNonTrivialSingleValueDecodableProperty() {
+        struct NestedValue : Decodable {
+            let string: String
+            
+            init(from decoder: Decoder) throws {
+                string = try decoder.singleValueContainer().decode(String.self)
+            }
+        }
+        
+        struct Value : Decodable {
+            let nestedValue: NestedValue
+            
+            init(from decoder: Decoder) throws {
+                nestedValue = try decoder.singleValueContainer().decode(NestedValue.self)
+            }
+        }
+        
+        struct Struct : RowConvertible, Decodable {
+            let value: Value
+            let optionalValue: Value?
+        }
+        
+        do {
+            // No null values
+            let s = Struct(row: ["value": "foo", "optionalValue": "bar"])
+            XCTAssertEqual(s.value.nestedValue.string, "foo")
+            XCTAssertEqual(s.optionalValue!.nestedValue.string, "bar")
+        }
+        
+        do {
+            // Null values
+            let s = Struct(row: ["value": "foo", "optionalValue": nil])
+            XCTAssertEqual(s.value.nestedValue.string, "foo")
+            XCTAssertNil(s.optionalValue)
+        }
+        
+        do {
+            // Missing and extra values
+            let s = Struct(row: ["value": "foo", "ignored": "?"])
+            XCTAssertEqual(s.value.nestedValue.string, "foo")
             XCTAssertNil(s.optionalValue)
         }
     }
@@ -260,6 +304,39 @@ extension RowConvertibleDecodableTests {
                 XCTAssertEqual(s.value.b, "bar")
                 XCTAssertNil(s.optionalValue)
             }
+        }
+    }
+    
+    func testKeyedDecodableRowConvertibleProperty() throws {
+        struct Value : Decodable, RowConvertible {
+            let a: String
+            let b: String
+            var initializedFromRow: Bool = false
+            
+            init(row: Row) {
+                a = row["a"]
+                b = row["b"]
+                initializedFromRow = true
+            }
+        }
+        
+        struct Struct : RowConvertible, Decodable {
+            let value: Value
+            let optionalValue: Value?
+        }
+        
+        let dbQueue = try makeDatabaseQueue()
+        try dbQueue.inDatabase { db in
+            let adapter = ScopeAdapter([
+                "value": SuffixRowAdapter(fromIndex: 0),
+                "optionalValue": ColumnMapping(["b": "a", "a": "b"])])
+            let s = try Struct.fetchOne(db, "SELECT ? AS a, ? AS b", arguments: ["foo", "bar"], adapter: adapter)!
+            XCTAssertEqual(s.value.a, "foo")
+            XCTAssertEqual(s.value.b, "bar")
+            XCTAssertTrue(s.value.initializedFromRow)
+            XCTAssertEqual(s.optionalValue!.a, "bar")
+            XCTAssertEqual(s.optionalValue!.b, "foo")
+            XCTAssertTrue(s.optionalValue!.initializedFromRow)
         }
     }
 }

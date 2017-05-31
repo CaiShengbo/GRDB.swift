@@ -37,10 +37,13 @@ private struct DatabaseValueDecodingContainer: SingleValueDecodingContainer {
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value cannot be converted to the requested type.
     /// - throws: `DecodingError.valueNotFound` if the encountered encoded value is null.
     func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
-        if let valueType = T.self as? DatabaseValueConvertible.Type {
-            return valueType.fromDatabaseValue(dbValue) as! T
+        if let type = T.self as? DatabaseValueConvertible.Type {
+            // Prefer DatabaseValueConvertible decoding over Decodable.
+            // This allows custom database decoding, such as decoding Date from
+            // String, for example.
+            return type.fromDatabaseValue(dbValue) as! T
         } else {
-            throw DecodingError.typeMismatch(T.self, DecodingError.Context(codingPath: codingPath, debugDescription: "type does not adopt DatabaseValueConvertible"))
+            return try T(from: DatabaseValueDecoder(dbValue: dbValue, codingPath: codingPath))
         }
     }
 }
