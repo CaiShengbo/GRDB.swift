@@ -2495,9 +2495,7 @@ let persons = try Person.fetchAll(statement, arguments: [1])  // [Person]
 
 [Swift Archival & Serialization](https://github.com/apple/swift-evolution/blob/master/proposals/0166-swift-archival-serialization.md) was introduced with Swift 4.
 
-When a type conforms to the standard `Codable`, `Encodable` or `Decodable` protocols, it becomes able to be encoded or decoded through various decoders and formats: JSON, PList, NSCoding, etc. Better, the Swift compiler generates the implementation of those protocols, as long as all properties of your record type are themselves codable.
-
-GRDB provides default implementation of `RowConvertible.init(row:)` and `Persistable.persistenceDictionary` on top of coding methods, which means that you don't need to write them down:
+GRDB provides default implementations for `RowConvertible.init(row:)` and `Persistable.persistenceDictionary` for record types that also adopt an archival protocol (`Codable`, `Encodable` or `Decodable`). When all their properties are themselves codable, Swift generates the archiving methods, and you don't need to write them down:
 
 ```swift
 // This is just enough...
