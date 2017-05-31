@@ -123,7 +123,7 @@ extension Row {
         return lazy.map { $0.0 }
     }
     
-    /// Returns true if and only if the row has that column.
+    /// Returns true if the row has that column.
     ///
     /// This method is case-insensitive.
     public func hasColumn(_ columnName: String) -> Bool {
@@ -462,6 +462,18 @@ extension Row {
 extension Row {
     
     // MARK: - Scopes
+    
+    /// Returns true if the row contains a scoped row with this identifier.
+    ///
+    /// This method is case-insensitive.
+    public func hasScope(_ name: String) -> Bool {
+        return impl.scopeNames.contains(name)
+    }
+    
+    /// The identifiers of all defined scopes
+    public var scopeNames: Set<String> {
+        return impl.scopeNames
+    }
     
     /// Returns a scoped row, if the row was fetched along with a row adapter
     /// that defines this scope.
