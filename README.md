@@ -1,14 +1,15 @@
-GRDB.swift [![Swift](https://img.shields.io/badge/swift-3-orange.svg?style=flat)](https://developer.apple.com/swift/) [![Platforms](https://img.shields.io/cocoapods/p/GRDB.swift.svg)](https://developer.apple.com/swift/) [![License](https://img.shields.io/github/license/groue/GRDB.swift.svg?maxAge=2592000)](/LICENSE) [![Build Status](https://travis-ci.org/groue/GRDB.swift.svg?branch=master)](https://travis-ci.org/groue/GRDB.swift)
+GRDB.swift [![Swift](https://img.shields.io/badge/swift-4-orange.svg?style=flat)](https://developer.apple.com/swift/) [![Platforms](https://img.shields.io/cocoapods/p/GRDB.swift.svg)](https://developer.apple.com/swift/) [![License](https://img.shields.io/github/license/groue/GRDB.swift.svg?maxAge=2592000)](/LICENSE) [![Build Status](https://travis-ci.org/groue/GRDB.swift.svg?branch=master)](https://travis-ci.org/groue/GRDB.swift)
 ==========
 
 ### A toolkit for SQLite databases, with a focus on application development
 
 **Latest release**: May 28, 2017 &bull; version 0.110.0 &bull; [CHANGELOG](CHANGELOG.md)
 
-**Requirements**: iOS 8.0+ / OSX 10.9+ / watchOS 2.0+ &bull; Xcode 8.1+ &bull; Swift 3
+**Requirements**: iOS 8.0+ / OSX 10.9+ / watchOS 2.0+ &bull; Xcode 8.3+ &bull; Swift 4
 
 - Swift 2.2: use the [version 0.80.2](https://github.com/groue/GRDB.swift/tree/v0.80.2)
 - Swift 2.3: use the [version 0.81.2](https://github.com/groue/GRDB.swift/tree/v0.81.2)
+- Swift 3, Swift 3.1: use the [version 0.110.0](https://github.com/groue/GRDB.swift/tree/v0.110.0)
 
 Follow [@groue](http://twitter.com/groue) on Twitter for release announcements and usage tips.
 
@@ -1731,6 +1732,10 @@ Your custom structs and classes can adopt each protocol individually, and opt in
 - [The Implicit RowID Primary Key](#the-implicit-rowid-primary-key)
 - **[List of Record Methods](#list-of-record-methods)**
 
+**Records, Swift Archival & Serialization**
+
+- [Codable Records](#codable-records)
+
 
 ### Inserting Records
 
@@ -1869,6 +1874,8 @@ See [column values](#column-values) for more information about the `row[...]` su
 
 > :point_up: **Note**: for performance reasons, the same row argument to `init(row:)` is reused during the iteration of a fetch query. If you want to keep the row for later use, make sure to store a copy: `self.row = row.copy()`.
 
+**The `init(row:)` initializer can be automatically generated** when your type adopts the standard `Decodable` protocol. See [Codable Records](#codable-records) for more information.
+
 RowConvertible allows adopting types to be fetched from SQL queries:
 
 ```swift
@@ -1896,7 +1903,7 @@ extension PointOfInterest : RowConvertible {
 }
 ```
 
-Occasionnally, you'll want to write a complex SQL query that uses different column names. In this case, [row adapters](#row-adapters) are there to help you mapping raw column names to the names expected by your RowConvertible types.
+Occasionally, you'll want to write a complex SQL query that uses different column names. In this case, [row adapters](#row-adapters) are there to help you mapping raw column names to the names expected by your RowConvertible types.
 
 
 ## TableMapping Protocol
@@ -1996,6 +2003,8 @@ Yes, two protocols instead of one. Both grant exactly the same advantages. Here 
 - Otherwise, stick with `Persistable`. Particularly if your type is a class.
 
 The `persistentDictionary` property returns a dictionary whose keys are column names, and values any DatabaseValueConvertible value (Bool, Int, String, Date, Swift enums, etc.) See [Values](#values) for more information.
+
+**`persistentDictionary` can be automatically generated** when your type adopts the standard `Encodable` protocol. See [Codable Records](#codable-records) for more information.
 
 The optional `didInsert` method lets the adopting type store its rowID after successful insertion. If your table has an INTEGER PRIMARY KEY column, you are likely to define this method. Otherwise, you can safely ignore it. It is called from a protected dispatch queue, and serialized with all database updates.
 
@@ -2480,6 +2489,33 @@ let persons = try Person.fetchAll("SELECT * FROM persons WHERE id = ?", argument
 let statement = try db.makeSelectStatement("SELECT * FROM persons WHERE id = ?")
 let persons = try Person.fetchAll(statement, arguments: [1])  // [Person]
 ```
+
+
+## Codable Records
+
+[Swift Archival & Serialization](https://github.com/apple/swift-evolution/blob/master/proposals/0166-swift-archival-serialization.md) was introduced with Swift 4.
+
+When a type conforms to the standard `Codable`, `Encodable` or `Decodable` protocols, it becomes able to be encoded or decoded through various decoders and formats: JSON, PList, NSCoding, etc. Better, the Swift compiler generates the implementation of those protocols, as long as all properties of your record type are themselves codable.
+
+GRDB provides default implementation of `RowConvertible.init(row:)` and `Persistable.persistenceDictionary` on top of coding methods, which means that you don't need to write them down:
+
+```swift
+// This is just enough...
+struct Player: RowConvertible, Persistable, Codable {
+    static let databaseTableName = "players"
+    
+    let name: String
+    let score: Int
+}
+
+// ... so that you can save and fetch players:
+try dbQueue.inDatabase { db in
+    try Player(name: "Arthur", score: 100).insert(db)
+    let players = try Player.fetchAll(db)
+}
+```
+
+> :point_up: **Note**: Some types have a different way to encode and decode themselves in a standard archive vs. the database. For example, [Date](#date-and-datecomponents) saves itself as a timestamp (archive) or a string (database). When such an ambiguity happens, GRDB always favors customized database encoding and decoding.
 
 
 The Query Interface
