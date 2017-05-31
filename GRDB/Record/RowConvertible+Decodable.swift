@@ -217,11 +217,13 @@ private struct RowDecoder: Decoder {
     
     func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> {
         if let key = codingPath.last {
+            // Asked for a keyed type: look for a row scope
             guard let scopedRow = row.scoped(on: key!.stringValue) else {
                 throw DecodingError.keyNotFound(key!, DecodingError.Context(codingPath: codingPath, debugDescription: "missing row scope: \(key!.stringValue)"))
             }
             return KeyedDecodingContainer(RowKeyedDecodingContainer<Key>(row: scopedRow, codingPath: codingPath))
         } else {
+            // Asked for a keyed type at the top level
             return KeyedDecodingContainer(RowKeyedDecodingContainer<Key>(row: row, codingPath: codingPath))
         }
     }
